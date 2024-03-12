@@ -25,7 +25,7 @@ use Twig\Environment;
 class MailFactory implements MailFactoryInterface
 {
     /**
-     * @var MailerInterface
+     * @var MailerInterface|\Swift_Mailer
      */
     protected $mailer;
 
@@ -39,7 +39,7 @@ class MailFactory implements MailFactoryInterface
      */
     protected $translator;
 
-    public function __construct(MailerInterface $mailer, Environment $twig, TranslatorInterface $translator)
+    public function __construct(MailerInterface|\Swift_Mailer $mailer, Environment $twig, TranslatorInterface $translator)
     {
         $this->mailer = $mailer;
         $this->twig = $twig;
@@ -83,9 +83,20 @@ class MailFactory implements MailFactoryInterface
     protected function sendEmail($from, $to, string $subject, string $template, array $data): void
     {
         $body = $this->twig->render($template, $data);
+        $translatedSubject = $this->translator->trans($subject);
+
+        if($this->mailer instanceof \Swift_Mailer) {
+            $message = new \Swift_Message();
+            $message->setSubject($this->translator->trans($subject));
+            $message->setFrom($from);
+            $message->setTo($to);
+            $message->setBody($body, 'text/html');
+            $this->mailer->send($message);
+            return;
+        }
 
         $email = (new Email())
-            ->subject($this->translator->trans($subject))
+            ->subject($translatedSubject)
             ->from($this->getAddress($from))
             ->to($this->getAddress($to))
             ->html($body);
